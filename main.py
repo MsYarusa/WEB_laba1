@@ -2,85 +2,62 @@ import socket
 import threading
 import game
 
-PORT = 3333
-SERVER = socket.gethostbyname(socket.gethostname())
-ADDR = (SERVER, PORT)
-
+PORT_SENDER = 3333
+PORT_RECEIVER = 5050
+IP = socket.gethostbyname(socket.gethostname())
 
 MSG_SIZE = 1024
 STOP_MSG = 'break'
 FORMAT = 'utf-8'
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind(ADDR)
-server2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server2.bind((SERVER, 5050))
+
+class Server:
+    def __init__(self, ip, port_sender, port_receiver):
+        self.ser_sender = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.ser_receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.ser_sender.bind((ip, port_sender))
+        self.ser_receiver.bind((ip, port_receiver))
+        self.window = threading.Thread(target=game.start_game)
+
+    def run(self):
+        print("[СЕРВЕР ЗАПУСКАЕТСЯ...]")
+        self.ser_sender.listen(2)
+        self.ser_receiver.listen(2)
+
+        self.window.start()
+
+        while True:
+            conn_recv, addr = self.ser_sender.accept()
+            conn_send, addr = self.ser_receiver.accept()
+            sending = threading.Thread(target=self.send_screen, args=(conn_recv, addr))
+            receiving = threading.Thread(target=self.process_conn, args=(conn_send, addr))
+            sending.start()
+            receiving.start()
+
+    def send_screen(self, conn, addr):
+
+        while True:
+            data = game.pg.image.tostring(game.buff_screen, 'RGB')
+
+            for chunk in (data[_:_ + 65535] for _ in range(0, len(data), 65535)):
+                conn.send(len(chunk).to_bytes(2, "big"))
+                conn.send(chunk)
+
+            conn.send(b"\x00\x00")
+
+    def process_conn(self, conn, addr):
+        print(f"[НОВОЕ СОЕДИНЕНИЕ] {addr} подключился")
+
+        connected = True
+        while connected:
+            data = conn.recv(MSG_SIZE).decode()
+            if data == STOP_MSG:
+                connected = False
+
+            game.buffer.append(data.split())
+
+        print("[СОЕДИНЕНИЕ ПРЕРВАНО...]")
 
 
-def start():
-    server.listen()
-    server2.listen()
-    win = threading.Thread(target=game.start_game)
-    win.start()
-    while True:
-        client, addr = server.accept()
-        client2, addr = server2.accept()
-        thread = threading.Thread(target=process_client, args=(client, addr))
-        thread.start()
-        thread2 = threading.Thread(target=process_client2, args=(client2, addr))
-        thread2.start()
-        print(f"[АКТИВНЫЕ СОЕДИНЕНИЯ] {threading.active_count() - 2}")
-
-
-def reliable_send(self, data: bytes) -> None:
-    """
-    Функция отправки данных в сокет
-    Обратите внимание, что данные ожидаются сразу типа bytes
-    """
-    # Разбиваем передаваемые данные на куски максимальной длины 0xffff (65535)
-    for chunk in (data[_:_+0xffff] for _ in range(0, len(data), 0xffff)):
-        print('processing...')
-        self.send(len(chunk).to_bytes(2, "big")) # Отправляем длину куска (2 байта)
-        self.send(chunk) # Отправляем сам кусок
-    print('finished')
-    self.send(b"\x00\x00") # Обозначаем конец передачи куском нулевой длины
-
-
-def process_client(client, addr):
-    print(f"[НОВОЕ СОЕДИНЕНИЕ] {addr} подключился")
-
-    connected = True
-    while connected:
-
-        data_im = game.pg.image.tostring(game.buff_screen, 'RGB')
-        reliable_send(client, data_im)
-
-    print("[СОЕДИНЕНИЕ ПРЕРВАНО...]")
-
-
-def process_client2(client2, addr):
-    print(f"[НОВОЕ СОЕДИНЕНИЕ] {addr} подключился")
-
-    # client.send("ПРИВЕТ".encode())
-    # print(client.recv(1024).decode())
-    # client.send("ПОКА".encode())
-
-    connected = True
-    while connected:
-        print('waiting for data')
-        data = client2.recv(MSG_SIZE).decode()
-        print('got_data')
-        if data == STOP_MSG:
-            connected = False
-
-        game.buffer.append(data.split())
-
-    print("[СОЕДИНЕНИЕ ПРЕРВАНО...]")
-
-
-print("[СЕРВЕР ЗАПУСКАЕТСЯ...]")
-start()
-
-
-
-
+server = Server(IP, PORT_SENDER, PORT_RECEIVER)
+server.run()
