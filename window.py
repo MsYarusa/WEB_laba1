@@ -22,7 +22,7 @@ def send_conf():
     root.destroy()
 
 
-IP = "127.0.0.1"
+IP = ""
 root = Tk()
 root.title('Подключение...')
 root.geometry('300x120+660+400')

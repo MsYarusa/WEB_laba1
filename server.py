@@ -27,14 +27,14 @@ class Server:
         self.window.start()
 
         while True:
-            conn_recv, addr = self.ser_sender.accept()
+            conn_recv, _ = self.ser_sender.accept()
             conn_send, addr = self.ser_receiver.accept()
-            sending = threading.Thread(target=self.send_screen, args=(conn_recv, addr))
+            sending = threading.Thread(target=self.send_screen, args=(conn_recv,))
             receiving = threading.Thread(target=self.process_conn, args=(conn_send, addr))
             sending.start()
             receiving.start()
 
-    def send_screen(self, conn, addr):
+    def send_screen(self, conn):
 
         while True:
             if game.flag:
@@ -56,8 +56,10 @@ class Server:
             data = conn.recv(MSG_SIZE).decode()
             if data == STOP_MSG:
                 connected = False
-
-            game.buffer.append(data.split())
+            else:
+                data = data.split()
+                if data[0] == 'M':
+                    game.mouse_events.append((data[1], data[2]))
 
         print("[СОЕДИНЕНИЕ ПРЕРВАНО...]")
 

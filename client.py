@@ -1,11 +1,11 @@
 import socket
 import pygame as pg
 import window
+import os
 import threading
 
 PORT_SENDER = 3333
 PORT_RECEIVER = 5050
-IP = "192.168.43.163"
 MSG_SIZE = 1024
 WIN_SIZE = (520, 520)
 STOP_MSG = 'break'
@@ -35,7 +35,7 @@ class Client:
 
     def run(self):
         screen = pg.display.set_mode(WIN_SIZE)
-        pg.display.set_caption('Клиент')
+        pg.display.set_caption('Саппер')
 
         running = True
         while running:
@@ -43,20 +43,25 @@ class Client:
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     self.sender.send(STOP_MSG.encode())
-                    running = False
+                    self.sender.close()
+                    self.receiver.close()
+                    pg.quit()
+                    os.abort()
                 if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
-                    data = (str(event.pos[0]) + ' ' + str(event.pos[1]))
+                    data = ' '.join(('M', str(event.pos[0]), str(event.pos[1])))
                     data_bytes = data.encode()
                     self.sender.send(data_bytes)
+                if event.type == pg.KEYDOWN:
+                    if event.key == pg.K_SPACE:
+                        data = ' '.join(('K', '-1', '-1'))
+                        data_bytes = data.encode()
+                        self.sender.send(data_bytes)
 
             image_bytes = self.receive()
             if image_bytes != b'':
                 image = pg.image.frombuffer(image_bytes, WIN_SIZE, 'RGB')
                 screen.blit(image, (0, 0))
             pg.display.flip()
-
-        self.sender.close()
-        self.receiver.close()
 
     def get_data(self, bytes_count):
 
@@ -78,6 +83,7 @@ class Client:
 
 client = Client(PORT_SENDER, PORT_RECEIVER)
 client.run()
+
 
 
 
