@@ -1,122 +1,127 @@
 import pygame as pg
-import random
+from random import choice
+from math import floor
+import time
 
-WIDTH = 800
-HEIGHT = 640
+WIDTH = 520
+HEIGHT = 520
 SIZE = (WIDTH, HEIGHT)
-WHITE = (255, 255, 255)
-
-horizontal_borders = pg.sprite.Group()
-vertical_borders = pg.sprite.Group()
-balls = pg.sprite.Group()
-all_sprites = pg.sprite.Group()
+BOARD_WIDTH = 10
+BOARD_HEIGHT = 10
 
 buffer = []
 buff_screen = pg.Surface(SIZE)
 
 
-class Ball(pg.sprite.Sprite):
-    def __init__(self, radius, x, y, color):
-        super().__init__(all_sprites)
-        self.add(balls)
-        self.radius = radius
-        self.image = pg.Surface((2 * radius, 2 * radius), pg.SRCALPHA, 32)
-        pg.draw.circle(self.image, pg.Color(color), (radius, radius), radius)
-        self.mask = pg.mask.from_surface(self.image)
-        self.rect = pg.Rect(x, y, 2 * radius, 2 * radius)
+class Board:
+    # создание поля
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self.board = [[0] * width for _ in range(height)]
+        # значения по умолчанию
+        self.left = 10
+        self.top = 10
+        self.cell_size = 30
 
-        vx = random.randint(-5, 5)
-        while not vx:
-            vx = random.randint(-5, 5)
+    # настройка внешнего вида
+    def set_view(self, left, top, cell_size):
+        self.left = left
+        self.top = top
+        self.cell_size = cell_size
 
-        vy = random.randint(-5, 5)
-        while not vy:
-            vy = random.randint(-5, 5)
+    def render(self, screen):
+        for j in range(self.height):
+            for i in range(self.width):
+                pg.draw.rect(screen, (255, 255, 255), (
+                    self.left + i * self.cell_size, self.top + j * self.cell_size, self.cell_size, self.cell_size), 1)
 
-        self.vx = vx
-        self.vy = vy
+    def get_cell(self, mouse_pos):
 
-        if x + 2 * radius + 5 > WIDTH or x - 5 < 0:
-            self.kill()
+        x = floor((int(mouse_pos[0]) - self.left) / self.cell_size)
+        y = floor((int(mouse_pos[1]) - self.top) / self.cell_size)
 
-        if y + 2 * radius + 5 > HEIGHT or y - 5 < 0:
-            self.kill()
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return x, y
+        else:
+            return None
 
-    def update(self):
-        self.rect = self.rect.move(self.vx, self.vy)
-        if pg.sprite.spritecollideany(self, horizontal_borders):
-            delta_x = WIDTH // 2 - self.rect.centerx
-            delta_y = HEIGHT // 2 - self.rect.centery
-            dist = round((delta_x ** 2 + delta_y ** 2) ** 0.5)
-            self.rect.move_ip( 3 * delta_x // dist, 3 * delta_y // dist)
-            self.vy = -self.vy
+    def make_it_mine(self, cell_coords, screen):
+        x = int(cell_coords[0])
+        y = int(cell_coords[1])
+        pg.draw.rect(screen, (255, 0, 0), (
+            self.left + x * self.cell_size, self.top + y * self.cell_size, self.cell_size, self.cell_size))
+        self.board[x][y] = -1
 
-        if pg.sprite.spritecollideany(self, vertical_borders):
-            delta_x = WIDTH // 2 - self.rect.centerx
-            delta_y = HEIGHT // 2 - self.rect.centery
-            dist = round((delta_x ** 2 + delta_y ** 2) ** 0.5)
-            self.rect.move_ip(3 * delta_x // dist, 3 * delta_y // dist)
-            self.vx = -self.vx
+    def on_click(self, cell_coords, screen):
+        x = cell_coords[0]
+        y = cell_coords[1]
+        if self.board[x][y] != 0:
+            return
 
-        for ball in balls:
-            if ball is not self and pg.sprite.collide_mask(self, ball) is not None:
-                delta_x = self.rect.centerx - ball.rect.centerx
-                delta_y = self.rect.centery - ball.rect.centery
-                dist = round((delta_x ** 2 + delta_y ** 2) ** 0.5)
+        mines = 0
+        for delta_x in (-1, 0, 1):
+            for delta_y in (-1, 0, 1):
+                if 0 <= x + delta_x < self.width and 0 <= y + delta_y < self.height:
+                    if self.board[x + delta_x][y + delta_y] == -1:
+                        mines += 1
 
-                self.rect.move_ip(delta_x // dist, delta_y // dist)
-                ball.rect.move_ip(-1 * delta_x // dist, -1 * delta_y // dist)
-                self.vx, ball.vx = ball.vx, self.vx
-                self.vy, ball.vy = ball.vy, self.vy
+        font = pg.font.Font(None, self.cell_size // 2)
+        text = font.render(str(mines), True, (255, 255, 255))
+        text_x = self.left + x * self.cell_size + self.cell_size // 2 - text.get_width() // 2
+        text_y = self.top + y * self.cell_size + self.cell_size // 2 - text.get_height() // 2
+        screen.blit(text, (text_x, text_y))
 
+    def get_click(self, mouse_pos, screen):
+        cell = self.get_cell(mouse_pos)
 
-class Border(pg.sprite.Sprite):
-    # строго вертикальный или строго горизонтальный отрезок
-    def __init__(self, x1, y1, x2, y2):
-        super().__init__(all_sprites)
-        if x1 == x2:  # вертикальная стенка
-            self.add(vertical_borders)
-            self.image = pg.Surface([1, y2 - y1])
-            self.rect = pg.Rect(x1, y1, 1, y2 - y1)
-        else:  # горизонтальная стенка
-            self.add(horizontal_borders)
-            self.image = pg.Surface([x2 - x1, 1])
-            self.rect = pg.Rect(x1, y1, x2 - x1, 1)
+        if not (cell is None):
+            self.on_click(cell, screen)
 
+flag = True
 
-def start_game():
+def semisapper(ip):
+    pg.init()
+    mines_count = 10
+
     screen = pg.display.set_mode(SIZE)
-    pg.display.set_caption('Шарики')
+    pg.display.set_caption(ip)
+    screen.fill((0, 0, 0))
+    board = Board(BOARD_WIDTH, BOARD_HEIGHT)
+    board.set_view(10, 10, 50)
+    board.render(screen)
 
-    color = pg.Color(255, 0, 0)
-    hsv = color.hsva
+    possible_mines = []
 
-    Border(5, 5, WIDTH - 5, 5)
-    Border(5, HEIGHT - 5, WIDTH - 5, HEIGHT - 5)
-    Border(5, 5, 5, HEIGHT - 5)
-    Border(WIDTH - 5, 5, WIDTH - 5, HEIGHT - 5)
+    for i in range(BOARD_HEIGHT):
+        for j in range(BOARD_WIDTH):
+            possible_mines.append((j, i))
 
-    clock = pg.time.Clock()
-    FPS = 60
+    mines = []
+
+    for i in range(mines_count):
+        mine = choice(possible_mines)
+        possible_mines.remove(mine)
+        mines.append(mine)
+
+    for i in range(mines_count):
+        board.make_it_mine(mines[i], screen)
 
     running = True
     while running:
-
-        clock.tick(FPS)
+        global flag
 
         if buffer:
             for pos in buffer:
-                color.hsva = ((hsv[0] + random.randint(0, 360)) % 360, hsv[1], hsv[2], hsv[3])
-                Ball(20, int(pos[0]), int(pos[1]), color)
-                all_sprites.update()
-                buffer.remove(pos)
+                board.get_click(pos, screen)
+                flag = True
 
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 running = False
 
-        all_sprites.update()
-        screen.fill(WHITE)
-        all_sprites.draw(screen)
-        buff_screen.blit(screen, (0, 0))
+        if flag:
+            buff_screen.blit(screen, (0, 0))
+            time.sleep(0.01)
+
         pg.display.flip()

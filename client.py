@@ -1,21 +1,37 @@
 import socket
 import pygame as pg
+import window
+import threading
 
 PORT_SENDER = 3333
 PORT_RECEIVER = 5050
-IP = "10.23.30.101"
+IP = "192.168.43.163"
 MSG_SIZE = 1024
-WIN_SIZE = (800, 640)
+WIN_SIZE = (520, 520)
 STOP_MSG = 'break'
 
 
 class Client:
-    def __init__(self, ip, port_sender, port_receiver):
+    def __init__(self, port_sender, port_receiver):
+        self.port_sender = port_sender
+        self.port_receiver = port_receiver
         self.sender = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sender.connect((ip, port_receiver))
-        self.receiver.connect((ip, port_sender))
-        self.number = ""
+
+        connection = threading.Thread(target=self.connect)
+        connection.start()
+        window.root.mainloop()
+
+    def connect(self):
+        trying = True
+        while trying:
+            try:
+                self.sender.connect((window.IP, self.port_receiver))
+                self.receiver.connect((window.IP, self.port_sender))
+                window.send_conf()
+                trying = False
+            except:
+                window.send_error()
 
     def run(self):
         screen = pg.display.set_mode(WIN_SIZE)
@@ -34,11 +50,13 @@ class Client:
                     self.sender.send(data_bytes)
 
             image_bytes = self.receive()
-            image = pg.image.frombuffer(image_bytes, WIN_SIZE, 'RGB')
-            screen.blit(image, (0, 0))
+            if image_bytes != b'':
+                image = pg.image.frombuffer(image_bytes, WIN_SIZE, 'RGB')
+                screen.blit(image, (0, 0))
             pg.display.flip()
 
-        client.close()
+        self.sender.close()
+        self.receiver.close()
 
     def get_data(self, bytes_count):
 
@@ -58,7 +76,7 @@ class Client:
             data += self.get_data(part_len)
 
 
-client = Client(IP, PORT_SENDER, PORT_RECEIVER)
+client = Client(PORT_SENDER, PORT_RECEIVER)
 client.run()
 
 

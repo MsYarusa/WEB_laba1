@@ -17,7 +17,7 @@ class Server:
         self.ser_receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ser_sender.bind((ip, port_sender))
         self.ser_receiver.bind((ip, port_receiver))
-        self.window = threading.Thread(target=game.start_game)
+        self.window = threading.Thread(target=game.semisapper, args=(ip,))
 
     def run(self):
         print("[СЕРВЕР ЗАПУСКАЕТСЯ...]")
@@ -37,13 +37,16 @@ class Server:
     def send_screen(self, conn, addr):
 
         while True:
-            data = game.pg.image.tostring(game.buff_screen, 'RGB')
+            if game.flag:
+                data = game.pg.image.tostring(game.buff_screen, 'RGB')
 
-            for chunk in (data[_:_ + 65535] for _ in range(0, len(data), 65535)):
-                conn.send(len(chunk).to_bytes(2, "big"))
-                conn.send(chunk)
+                for chunk in (data[_:_ + 65535] for _ in range(0, len(data), 65535)):
+                    conn.send(len(chunk).to_bytes(2, "big"))
+                    conn.send(chunk)
 
-            conn.send(b"\x00\x00")
+                conn.send(b"\x00\x00")
+            else:
+                conn.send(b"\x00\x00")
 
     def process_conn(self, conn, addr):
         print(f"[НОВОЕ СОЕДИНЕНИЕ] {addr} подключился")
