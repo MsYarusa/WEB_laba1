@@ -65,7 +65,7 @@ class Board:
             self.board[x][y] = -1
 
     def restart(self, screen):
-        self.board = [[0] * self.width for _ in range(self.height)]
+        self.board = [[-2] * self.width for _ in range(self.height)]
 
         screen.fill((0, 0, 0))
         self.render(screen)
