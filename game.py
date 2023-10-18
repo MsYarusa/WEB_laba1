@@ -11,24 +11,32 @@ BOARD_WIDTH = 10
 BOARD_HEIGHT = 10
 
 mouse_events = []
+space_clicked = False
 buff_screen = pg.Surface(SIZE)
+need_to_send_screen = True
 
 
 class Board:
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.board = [[0] * width for _ in range(height)]
+        self.board = [[-2] * width for _ in range(height)]
         # значения по умолчанию
         self.left = 10
         self.top = 10
         self.cell_size = 30
+
         self.mines_amount = 10
+        self.clicked_count = 0
+        self.game_is_over = False
 
     def set_view(self, left, top, cell_size):
         self.left = left
         self.top = top
         self.cell_size = cell_size
+
+    def set_mines_amount(self, amount):
+        self.mines_amount = amount
 
     def render(self, screen):
         for j in range(self.height):
@@ -36,22 +44,7 @@ class Board:
                 pg.draw.rect(screen, (255, 255, 255), (
                     self.left + i * self.cell_size, self.top + j * self.cell_size, self.cell_size, self.cell_size), 1)
 
-    def get_cell(self, mouse_pos):
-
-        x = floor((int(mouse_pos[0]) - self.left) / self.cell_size)
-        y = floor((int(mouse_pos[1]) - self.top) / self.cell_size)
-
-        if 0 <= x < self.width and 0 <= y < self.height:
-            return x, y
-        else:
-            return None
-
-    def set_mines_amount(self, amount):
-        self.mines_amount = amount
-
-    def place_mines(self, screen):
-
-        self.render(screen)
+    def place_mines(self):
 
         possible_mines = []
 
@@ -71,14 +64,18 @@ class Board:
             y = mines[i][1]
             self.board[x][y] = -1
 
-    def start(self):
-        self.board = [[0] * width for _ in range(height)]
-        # значения по умолчанию
-        self.left = 10
-        self.top = 10
-        self.cell_size = 30
+    def restart(self, screen):
+        self.board = [[0] * self.width for _ in range(self.height)]
 
-    def end_game(self, screen):
+        screen.fill((0, 0, 0))
+        self.render(screen)
+
+        self.place_mines()
+
+        self.clicked_count = 0
+        self.game_is_over = False
+
+    def end_game(self, screen, lost):
         for x in range(self.width):
             for y in range(self.height):
                 if self.board[x][y] == -1:
@@ -91,11 +88,16 @@ class Board:
         shadow.set_alpha(170)
         screen.blit(shadow, (0, 0))
 
+        if lost:
+            text = 'БААБАААХ...'
+        else:
+            text = 'ПОБЕДА?!?!?!?'
+
         label_font = pg.font.SysFont('calibry', 50)
-        text_rendered = label_font.render('БААБАААХ...', 0, pg.Color('white'))
+        text_rendered = label_font.render(text, 0, pg.Color('white'))
         text_rect = text_rendered.get_rect()
         text_rect.centerx = WIDTH // 2
-        text_rect.centery = HEIGHT // 2 - 15
+        text_rect.centery = HEIGHT // 2 - 20
         screen.blit(text_rendered, text_rect)
 
         label_font = pg.font.SysFont('calibry', 24)
@@ -110,10 +112,11 @@ class Board:
         y = cell_coords[1]
 
         if self.board[x][y] == -1:
-            self.end_game(screen)
+            self.game_is_over = True
+            self.end_game(screen, True)
             return
 
-        if self.board[x][y] != 0:
+        if self.board[x][y] != -2:
             return
 
         mines = 0
@@ -129,6 +132,21 @@ class Board:
         text_y = self.top + y * self.cell_size + self.cell_size // 2 - text.get_height() // 2
         screen.blit(text, (text_x, text_y))
 
+        self.clicked_count += 1
+        if (self.clicked_count + self.mines_amount) == 100:
+            self.game_is_over = True
+            self.end_game(screen, False)
+
+    def get_cell(self, mouse_pos):
+
+        x = floor((int(mouse_pos[0]) - self.left) / self.cell_size)
+        y = floor((int(mouse_pos[1]) - self.top) / self.cell_size)
+
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return x, y
+        else:
+            return None
+
     def get_click(self, mouse_pos, screen):
         cell = self.get_cell(mouse_pos)
 
@@ -136,29 +154,32 @@ class Board:
             self.on_click(cell, screen)
 
 
-flag = True
-
-
-def semisapper(ip):
+def sapper(ip):
     pg.init()
-    mines_count = 10
 
     screen = pg.display.set_mode(SIZE)
     pg.display.set_caption(ip)
     screen.fill((0, 0, 0))
     board = Board(BOARD_WIDTH, BOARD_HEIGHT)
     board.set_view(10, 10, 50)
-    board.place_mines(screen)
+    board.render(screen)
+    board.place_mines()
 
     running = True
     while running:
-        global flag
+        global need_to_send_screen, space_clicked
 
         if mouse_events:
             for pos in mouse_events:
-                board.get_click(pos, screen)
-                flag = True
+                if not board.game_is_over:
+                    board.get_click(pos, screen)
+                need_to_send_screen = True
                 mouse_events.remove(pos)
+
+        if space_clicked:
+            space_clicked = False
+            if board.game_is_over:
+                board.restart(screen)
 
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -166,7 +187,7 @@ def semisapper(ip):
                 pg.quit()
                 os.abort()
 
-        if flag:
+        if need_to_send_screen:
             buff_screen.blit(screen, (0, 0))
             time.sleep(0.01)
 

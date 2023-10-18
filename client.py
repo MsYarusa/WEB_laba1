@@ -53,7 +53,7 @@ class Client:
                     self.sender.send(data_bytes)
                 if event.type == pg.KEYDOWN:
                     if event.key == pg.K_SPACE:
-                        data = ' '.join(('K', '-1', '-1'))
+                        data = ' '.join(('S', '-1', '-1'))
                         data_bytes = data.encode()
                         self.sender.send(data_bytes)
 

@@ -17,7 +17,7 @@ class Server:
         self.ser_receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ser_sender.bind((ip, port_sender))
         self.ser_receiver.bind((ip, port_receiver))
-        self.window = threading.Thread(target=game.semisapper, args=(ip,))
+        self.window = threading.Thread(target=game.sapper, args=(ip,))
 
     def run(self):
         print("[СЕРВЕР ЗАПУСКАЕТСЯ...]")
@@ -37,7 +37,7 @@ class Server:
     def send_screen(self, conn):
 
         while True:
-            if game.flag:
+            if game.need_to_send_screen:
                 data = game.pg.image.tostring(game.buff_screen, 'RGB')
 
                 for chunk in (data[_:_ + 65535] for _ in range(0, len(data), 65535)):
@@ -60,6 +60,8 @@ class Server:
                 data = data.split()
                 if data[0] == 'M':
                     game.mouse_events.append((data[1], data[2]))
+                if data[0] == 'S':
+                    game.space_clicked = True
 
         print("[СОЕДИНЕНИЕ ПРЕРВАНО...]")
 
